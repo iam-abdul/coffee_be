@@ -8,6 +8,8 @@ import swaggerSetup from "./src/utils/swagger/setup.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import ExpressMongoSanitize from "express-mongo-sanitize";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 dotenv.config();
@@ -16,6 +18,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(connectToDBMiddleware);
+app.use(ExpressMongoSanitize());
 
 swaggerSetup(app);
 

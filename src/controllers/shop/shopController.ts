@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import mongoose from "mongoose";
+import mongoose, { PipelineStage } from "mongoose";
 import { IShop, Shop } from "../../models/Shop.js";
 import { EItemTypes, IItem, Item } from "./../../models/Items.js";
 import { addShopSchema, addItemSchema, addReviewSchema } from "./shopSchema.js";
@@ -609,8 +609,107 @@ export const getShop = async (req: Request, res: Response) => {
 
 export const search = async (req: Request, res: Response) => {
   try {
+    const search = String(req.query.q);
+
+    let pipeline: PipelineStage[] = [
+      {
+        $search: {
+          index: "coffee_shop",
+          text: {
+            query: search,
+            path: {
+              wildcard: "*",
+            },
+          },
+        },
+      },
+      {
+        $limit: 20,
+      },
+      {
+        $lookup: {
+          from: "reviews",
+          localField: "_id",
+          foreignField: "shopId",
+          as: "reviews",
+        },
+      },
+      {
+        $unwind: {
+          path: "$reviews",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $group: {
+          _id: "$_id",
+          name: { $first: "$name" },
+          description: { $first: "$description" },
+          image: { $first: "$image" },
+          lat: { $first: "$lat" },
+          long: { $first: "$long" },
+          city: { $first: "$city" },
+          state: { $first: "$state" },
+          rating: { $avg: { $ifNull: ["$reviews.rating", 5] } },
+          total_ratings: {
+            $sum: { $cond: [{ $ne: ["$reviews.rating", null] }, 1, 0] },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          description: 1,
+          image: 1,
+          lat: 1,
+          long: 1,
+          city: 1,
+          state: 1,
+          rating: 1,
+          total_ratings: 1,
+        },
+      },
+    ];
+
+    console.log("query is ", req.query);
+
+    if (req.query.sort) {
+      const sortKey = req.query.sort as string;
+      pipeline.push({
+        $sort: { [sortKey]: req.query.order === "asc" ? 1 : -1 },
+      });
+    }
+
+    const items = req.query.items as string;
+    if (
+      (items && items.includes("FOOD")) ||
+      items.includes("DRINKS") ||
+      items.includes("COFFEE")
+    ) {
+      pipeline.push({
+        $lookup: {
+          from: "items",
+          localField: "_id",
+          foreignField: "shopId",
+          as: "items",
+        },
+      });
+      pipeline.push({
+        $match: {
+          "items.type": { $in: items.split(",") },
+        },
+      });
+    }
+
+    console.log("the pipeline is ", JSON.stringify(pipeline));
+
+    const shops = await Shop.aggregate(pipeline);
+    return res.status(200).json({
+      shops,
+    });
   } catch (err) {
-    console.log("Err searching ");
+    console.log("Err searching ", err);
     return res.status(500).json({ message: "internal server error" });
   }
 };
