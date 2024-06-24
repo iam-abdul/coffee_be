@@ -1,0 +1,33 @@
+app: coffee
+service: backend
+provider:
+  name: aws
+  runtime: nodejs20.x
+  versionFunctions: false
+  stage: ${opt:stage, 'local'} # setting the env stage to local, this will be visible in the routes
+  region: "ap-south-1"
+  memorySize: 2048 # set the maximum memory of the Lambdas in Megabytes
+  timeout: 30 # The default is 6 seconds. Note: API Gateway current maximum is 30 seconds
+  environment:
+    NODE_ENV: ${file(./config.${self:provider.stage}.json):NODE_ENV}
+    DB_CONNECTION_URI: ${file(./config.${self:provider.stage}.json):DB_CONNECTION_URI}
+
+package:
+  exclude:
+    - "**/*.ts"
+    - "**/*.test.ts"
+
+functions:
+  app:
+    handler: dist/server.run
+    events:
+      - http: ANY /
+      - http: "ANY /{proxy+}"
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 3090
+    noPrependStageInUrl: true

@@ -1,0 +1,4 @@
+{
+  "NODE_ENV": "dev",
+  "DB_CONNECTION_URI": "mongodb+srv://abd:b6vdLw6HZSOcdK78@cluster0.xrqfr.mongodb.net/coffee"
+}
